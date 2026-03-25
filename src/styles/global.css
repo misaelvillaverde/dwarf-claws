@@ -1,0 +1,87 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0a0a0a;
+  --bg-panel: #111111;
+  --bg-hover: #1a1a1a;
+  --bg-selected: #222200;
+  --border: #808080;
+  --border-bright: #aaaaaa;
+  --text: #cccccc;
+  --text-dim: #666666;
+  --green: #00ff00;
+  --yellow: #ffff00;
+  --cyan: #00ffff;
+  --orange: #ff8800;
+  --blue: #8888ff;
+  --red: #ff4444;
+  --white: #ffffff;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: "IBM Plex Mono", "Fira Code", "SF Mono", "Cascadia Code", monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+input {
+  background: var(--bg);
+  color: var(--green);
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}
+
+input:focus {
+  border-color: var(--green);
+}
+
+button {
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: var(--bg-hover);
+  color: var(--white);
+}
+
+button.active {
+  background: var(--bg-selected);
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
