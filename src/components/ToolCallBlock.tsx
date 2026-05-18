@@ -1,8 +1,7 @@
 import { Component, createSignal, createMemo, Show } from "solid-js";
 import type { ContentBlock } from "../lib/types";
-import { sendTmuxKeys, captureTmuxPane } from "../lib/api";
+import { sendTmuxKeys } from "../lib/api";
 import { useSharedClock } from "../lib/clock";
-import { parsePromptOptions, keyForIntent } from "../lib/promptDetection";
 import { decisionFor, setToolDecision, decisionLabel } from "../lib/toolDecisions";
 
 interface Props {
@@ -50,18 +49,9 @@ const ToolCallBlock: Component<Props> = (props) => {
     setBusy(true);
     setStatus(null);
     try {
-      let key: string;
-      if (intent === "esc") {
-        key = "Escape";
-      } else {
-        try {
-          const text = await captureTmuxPane(props.pane!);
-          const parsed = parsePromptOptions(text);
-          key = keyForIntent(intent, parsed);
-        } catch {
-          key = keyForIntent(intent, { allow: null, always: null, deny: null, raw: [], detected: false });
-        }
-      }
+      // Fixed mapping: CC permission prompt is always 1=Allow, 2=Always, 3=Deny.
+      const KEY: Record<string, string> = { allow: "1", always: "2", deny: "3", esc: "Escape" };
+      const key = KEY[intent] ?? "Escape";
       await sendTmuxKeys(props.pane!, [key]);
       if (intent !== "esc") {
         setToolDecision(props.block.tool_id, intent);
