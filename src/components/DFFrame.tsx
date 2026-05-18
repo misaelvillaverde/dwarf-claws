@@ -12,7 +12,6 @@ const DFFrame: ParentComponent<Props> = (props) => {
       class={props.class}
       style={{
         border: "1px solid var(--border)",
-        position: "relative",
         display: "flex",
         "flex-direction": "column",
         overflow: "hidden",
@@ -22,16 +21,13 @@ const DFFrame: ParentComponent<Props> = (props) => {
       {props.title && (
         <div
           style={{
-            position: "absolute",
-            top: "-1px",
-            left: "8px",
-            background: "var(--bg)",
-            padding: "0 4px",
+            padding: "2px 8px",
             color: "var(--border-bright)",
             "font-weight": "bold",
-            "z-index": 1,
-            "line-height": "1",
-            transform: "translateY(-50%)",
+            "font-size": "12px",
+            "line-height": "1.4",
+            "flex-shrink": 0,
+            "border-bottom": "1px solid var(--border)",
           }}
         >
           {"[ "}{props.title}{" ]"}
@@ -42,7 +38,9 @@ const DFFrame: ParentComponent<Props> = (props) => {
           flex: 1,
           overflow: "auto",
           padding: "8px",
-          "padding-top": props.title ? "12px" : "8px",
+          display: "flex",
+          "flex-direction": "column",
+          "min-height": 0,
         }}
       >
         {props.children}
