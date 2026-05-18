@@ -5,7 +5,7 @@ description: Bump version, build DMG + .app, install locally, tag in git. Run be
 
 # /ship
 
-Ship a new local release of Dwarf Claws (Tauri 2 + SolidJS). Bumps version across three files, builds DMG + .app, installs to `/Applications`, commits, and tags. Does NOT push.
+Ship a new local release of Dwarf Claws (Tauri 2 + SolidJS). Bumps version across three files, builds DMG + .app, installs to `/Applications`, commits, tags, pushes, and publishes a GitHub release with the DMG attached.
 
 Repo root: `/Users/misaelvillaverde/Developer/potifar/dwarf-claws`
 
@@ -83,7 +83,7 @@ rm -rf "/Applications/Dwarf Claws.app" && cp -R "/Users/misaelvillaverde/Develop
 
 If this fails due to permissions, surface the raw error — don't swallow it.
 
-### 7. Commit and tag (no push)
+### 7. Commit, tag, and push
 
 Check what was modified:
 
@@ -98,17 +98,19 @@ Stage only these (and only if modified):
 - `src-tauri/Cargo.lock` (only if `git status` shows it modified)
 - `pnpm-lock.yaml` (only if `git status` shows it modified)
 
-Then:
+Then commit, tag, and push:
 
 ```
 cd /Users/misaelvillaverde/Developer/potifar/dwarf-claws && git commit -m "chore: bump v<new>"
 cd /Users/misaelvillaverde/Developer/potifar/dwarf-claws && git tag "v<new>"
+cd /Users/misaelvillaverde/Developer/potifar/dwarf-claws && git push
+cd /Users/misaelvillaverde/Developer/potifar/dwarf-claws && git push origin "v<new>"
 ```
 
 Hard rules:
 - Commit message is exactly `chore: bump v<new>`. No body. No trailers.
 - NEVER add Claude as a commit author. Use default git settings (no `--author`, no `Co-Authored-By`).
-- NEVER push. No `git push`. No `git push --tags`.
+- Push the current branch AND the tag. Never force-push.
 
 ### 8. Find the DMG
 
@@ -116,25 +118,38 @@ Hard rules:
 ls /Users/misaelvillaverde/Developer/potifar/dwarf-claws/src-tauri/target/release/bundle/dmg/*.dmg | tail -1
 ```
 
-Expected pattern: `Dwarf Claws_<new>_aarch64.dmg`. Capture the absolute path.
+Expected pattern: `Dwarf Claws_<new>_aarch64.dmg`. Capture the absolute path as `<dmg_path>`.
 
-### 9. Final summary (Spanish, terse)
+### 9. Publish GitHub release
+
+```
+gh release create "v<new>" "<dmg_path>" \
+  --repo misaelvillaverde/dwarf-claws \
+  --title "v<new>" \
+  --notes "Release v<new>" \
+  --latest
+```
+
+This uploads the DMG as an asset and marks the release as latest. If `gh` is not authenticated or the repo has no remote, surface the raw error and skip — the build is still good locally.
+
+### 10. Final summary (Spanish, terse)
 
 Print to the user:
 
 ```
 Version: X.Y.Z -> A.B.C
 App reinstalada en /Applications/Dwarf Claws.app — Cmd+Q y relanza
-Tag v<new> creado local (no push)
-DMG: <absolute-path>
+Tag v<new> pusheado
+Release: https://github.com/misaelvillaverde/dwarf-claws/releases/tag/v<new>
+DMG: <dmg_path>
 ```
 
-The final line must be exactly `DMG: <absolute-path>` so the user can copy it.
+The last line must be exactly `DMG: <dmg_path>` so the user can copy it.
 
 ## Guardrails recap
 
 - Three version files must agree before AND after.
 - Don't bundle unrelated changes into the version commit.
-- Build failure = stop, no commit/tag/install, leave bumped files in place.
-- No push, no Claude author, no extra commit body.
-- Surface filesystem permission errors verbatim.
+- Build failure = stop, no commit/tag/install/push, leave bumped files in place.
+- Never force-push. Never amend a published commit.
+- Surface filesystem and gh CLI errors verbatim.
