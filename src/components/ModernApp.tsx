@@ -874,6 +874,7 @@ const Conversation: Component<{
     const newSession = firstMsgId !== lastFirstMsgId;
     const newMessages = !newSession && msgCount > lastMsgCount;
     const tailingTurnedOn = tailing && !lastTailing;
+    const optimisticAppend = newMessages && !!msgs[msgs.length - 1]?._optimistic;
     if (newSession) {
       if (tailing) {
         queueMicrotask(() => {
@@ -883,7 +884,7 @@ const Conversation: Component<{
         scrollRef.scrollTop = 0;
       }
       setExpandedTools(new Set<string>());
-    } else if (tailing && (newMessages || tailingTurnedOn)) {
+    } else if (tailing && (newMessages || tailingTurnedOn) || optimisticAppend) {
       queueMicrotask(() => {
         if (scrollRef) scrollRef.scrollTop = scrollRef.scrollHeight;
       });

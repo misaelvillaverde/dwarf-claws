@@ -82,6 +82,8 @@ const ConversationView: Component<Props> = (props) => {
     const newSession = firstMsgId !== lastFirstMsgId;
     const newMessages = !newSession && msgCount > lastMsgCount;
     const tailingTurnedOn = tailing && !lastTailing;
+    // Always scroll when the user just sent (optimistic append), even without tailing.
+    const optimisticAppend = newMessages && !!msgs[msgs.length - 1]?._optimistic;
 
     if (newSession) {
       if (tailing && scrollRef) {
@@ -92,7 +94,7 @@ const ConversationView: Component<Props> = (props) => {
         scrollRef.scrollTop = 0;
       }
       setExpandedTools(new Set<string>());
-    } else if (tailing && (newMessages || tailingTurnedOn) && scrollRef) {
+    } else if ((tailing && (newMessages || tailingTurnedOn) || optimisticAppend) && scrollRef) {
       queueMicrotask(() => {
         if (scrollRef) scrollRef.scrollTop = scrollRef.scrollHeight;
       });
