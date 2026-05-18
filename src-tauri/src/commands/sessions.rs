@@ -111,9 +111,10 @@ pub fn search_sessions(query: String) -> Vec<UnifiedSession> {
 
     all.into_iter()
         .filter(|s| {
-            s.first_user_message_preview
-                .as_ref()
-                .map_or(false, |m| m.to_lowercase().contains(&query_lower))
+            s.id.to_lowercase().contains(&query_lower)
+                || s.first_user_message_preview
+                    .as_ref()
+                    .map_or(false, |m| m.to_lowercase().contains(&query_lower))
                 || s.display_name
                     .as_ref()
                     .map_or(false, |n| n.to_lowercase().contains(&query_lower))
@@ -123,6 +124,9 @@ pub fn search_sessions(query: String) -> Vec<UnifiedSession> {
                 || s.project_path
                     .as_ref()
                     .map_or(false, |p| p.to_lowercase().contains(&query_lower))
+                || s.cwd
+                    .as_ref()
+                    .map_or(false, |c| c.to_lowercase().contains(&query_lower))
         })
         .collect()
 }

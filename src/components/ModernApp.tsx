@@ -142,6 +142,8 @@ const TopBar: Component<ModernAppProps> = (props) => {
         padding: "10px 16px 10px 82px",
         "border-bottom": "1px solid var(--border-soft)",
         background: "var(--bg)",
+        "-webkit-app-region": "drag",
+        "user-select": "none",
       }}
     >
       <div style={{ display: "flex", "align-items": "center", gap: "10px" }}>
@@ -511,11 +513,11 @@ const SessionGridCard: Component<{
       onContextMenu={props.onContextMenu}
       style={{
         cursor: "pointer",
-        padding: "14px",
+        padding: "10px 14px",
         display: "flex",
         "flex-direction": "column",
-        gap: "10px",
-        "min-height": "160px",
+        gap: "6px",
+        "min-height": "90px",
         outline: props.focused && !props.selected ? "1px dashed var(--m-accent)" : "none",
         "outline-offset": "1px",
       }}
@@ -544,30 +546,22 @@ const SessionGridCard: Component<{
       </div>
 
       <div style={{
-        color: "var(--m-text)", "font-weight": 600, "font-size": "13.5px",
-        "line-height": 1.35,
+        color: "var(--m-text)", "font-weight": 600, "font-size": "13px",
         overflow: "hidden", "text-overflow": "ellipsis",
-        display: "-webkit-box",
-        "-webkit-line-clamp": 2,
-        "-webkit-box-orient": "vertical",
-        "word-break": "break-word",
+        "white-space": "nowrap",
       }}>
         {name()}
       </div>
 
       <Show when={props.s.first_user_message_preview}>
         <div style={{
-          color: "var(--text-2)", "font-size": "12px", "line-height": 1.4,
+          color: "var(--text-2)", "font-size": "11.5px", "line-height": 1.35,
           overflow: "hidden", "text-overflow": "ellipsis",
-          display: "-webkit-box",
-          "-webkit-line-clamp": 2,
-          "-webkit-box-orient": "vertical",
+          "white-space": "nowrap",
         }}>
           {props.s.first_user_message_preview}
         </div>
       </Show>
-
-      <div style={{ flex: 1 }}></div>
 
       <div style={{
         "padding-top": "8px",
@@ -720,7 +714,10 @@ const SessionHeader: Component<{
       }}>{sessionName(s())}</h2>
 
       <Show when={s().first_user_message_preview}>
-        <p style={{ margin: 0, color: "var(--text-2)", "font-size": "12.5px", "line-height": 1.5 }}>
+        <p style={{
+          margin: 0, color: "var(--text-2)", "font-size": "11.5px", "line-height": 1.4,
+          overflow: "hidden", "text-overflow": "ellipsis", "white-space": "nowrap",
+        }}>
           {s().first_user_message_preview}
         </p>
       </Show>

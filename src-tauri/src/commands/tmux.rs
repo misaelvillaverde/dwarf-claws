@@ -711,10 +711,21 @@ fn match_numbered_option(line: &str) -> Option<(u8, String)> {
 }
 
 pub fn parse_cc_question(text: &str) -> Option<CcQuestion> {
-    let lines: Vec<String> = text.lines().map(strip_ansi).collect();
-    let n = lines.len();
+    let raw_lines: Vec<&str> = text.lines().collect();
+    let n = raw_lines.len();
     let start = n.saturating_sub(120);
-    let recent = &lines[start..];
+    let raw_recent = &raw_lines[start..];
+
+    // Require CC selector context in the recent block: at least one `❯` or
+    // box-drawing `│` character. Without this, plain numbered lists in user
+    // messages would be incorrectly parsed as CC questions.
+    let has_cc_context = raw_recent.iter().any(|l| l.contains('❯') || l.contains('│'));
+    if !has_cc_context {
+        return None;
+    }
+
+    let lines: Vec<String> = raw_recent.iter().map(|l| strip_ansi(l)).collect();
+    let recent = &lines[..];
 
     // Collect numbered option positions.
     let mut option_pos: Vec<(usize, u8, String)> = Vec::new();
