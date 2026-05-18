@@ -9,6 +9,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 
 interface Props {
   session: UnifiedSession;
+  onSend?: (text: string) => void;
 }
 
 const Composer: Component<Props> = (props) => {
@@ -76,6 +77,7 @@ const Composer: Component<Props> = (props) => {
     setSending(true);
     setStatus(null);
     try {
+      props.onSend?.(body);
       await sendToTmuxPane(pane, body);
       textareaRef.value = "";
       textareaRef.style.height = "auto";

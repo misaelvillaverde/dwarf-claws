@@ -39,6 +39,9 @@ export interface UnifiedMessage {
   content: ContentBlock[];
   timestamp: string | null;
   model: string | null;
+  /** Frontend-only: true while the message is being delivered to tmux but
+   *  not yet confirmed in the JSONL. Never set by Rust. */
+  _optimistic?: boolean;
 }
 
 export type ContentBlock =

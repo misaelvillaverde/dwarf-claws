@@ -904,15 +904,40 @@ const Conversation: Component<{
     >
       <For each={visibleMessages()}>
         {(msg) => (
-          <MessageBlock
-            message={msg}
-            getToolResult={getToolResult}
-            pendingIds={props.pendingIds}
-            firstPendingId={props.firstPendingId ?? null}
-            pane={props.pane ?? null}
-            isToolExpanded={isToolExpanded}
-            onToggleToolExpanded={toggleToolExpanded}
-          />
+          <Show
+            when={msg._optimistic}
+            fallback={
+              <MessageBlock
+                message={msg}
+                getToolResult={getToolResult}
+                pendingIds={props.pendingIds}
+                firstPendingId={props.firstPendingId ?? null}
+                pane={props.pane ?? null}
+                isToolExpanded={isToolExpanded}
+                onToggleToolExpanded={toggleToolExpanded}
+              />
+            }
+          >
+            <div style={{ opacity: 0.55 }}>
+              <MessageBlock
+                message={msg}
+                getToolResult={getToolResult}
+                pendingIds={props.pendingIds}
+                firstPendingId={props.firstPendingId ?? null}
+                pane={props.pane ?? null}
+                isToolExpanded={isToolExpanded}
+                onToggleToolExpanded={toggleToolExpanded}
+              />
+              <div style={{
+                "font-size": "10px",
+                color: "var(--text-3, var(--ink-3))",
+                "font-style": "italic",
+                padding: "0 0 8px 2px",
+              }}>
+                sending…
+              </div>
+            </div>
+          </Show>
         )}
       </For>
 
