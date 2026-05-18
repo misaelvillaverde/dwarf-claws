@@ -1,9 +1,25 @@
 [package]
 name = "dwarf-claws"
-version = "0.1.0"
+version = "0.2.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
+default-run = "dwarf-claws"
+
+[[bin]]
+name = "dwarf-claws"
+path = "src/main.rs"
+
+[[example]]
+name = "tmux_diag"
+path = "examples/tmux_diag.rs"
+
+[[example]]
+name = "send_test"
+path = "examples/send_test.rs"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt", "macros"] }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -20,6 +36,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
