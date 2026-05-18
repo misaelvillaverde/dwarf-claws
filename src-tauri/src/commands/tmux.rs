@@ -688,7 +688,12 @@ fn strip_ansi(s: &str) -> String {
 
 fn match_numbered_option(line: &str) -> Option<(u8, String)> {
     let cleaned = strip_ansi(line.trim_start());
-    let s = cleaned.trim_start();
+    // Strip leading whitespace AND interactive-prompt selector characters
+    // (❯, >, ○, ●) that appear before the number on the selected option.
+    let s = cleaned.trim_start_matches(|c: char| {
+        c.is_whitespace()
+            || matches!(c, '❯' | '>' | '○' | '●' | '*' | '■' | '▶' | '➜' | '→')
+    });
     let dot = s.find(". ")?;
     if dot == 0 || dot > 2 {
         return None;
@@ -708,7 +713,7 @@ fn match_numbered_option(line: &str) -> Option<(u8, String)> {
 pub fn parse_cc_question(text: &str) -> Option<CcQuestion> {
     let lines: Vec<String> = text.lines().map(strip_ansi).collect();
     let n = lines.len();
-    let start = n.saturating_sub(80);
+    let start = n.saturating_sub(120);
     let recent = &lines[start..];
 
     // Collect numbered option positions.
@@ -729,9 +734,10 @@ pub fn parse_cc_question(text: &str) -> Option<CcQuestion> {
         return None;
     }
 
-    // Options must appear in the most recent chunk (not ancient history).
-    let first_idx = option_pos[0].0;
-    if first_idx + 40 < recent.len() {
+    // The LAST option must appear in the most recent 30 lines so we don't
+    // detect already-answered questions that are still in the scrollback.
+    let last_idx = option_pos.last().map_or(0, |(i, _, _)| *i);
+    if last_idx + 30 < recent.len() {
         return None;
     }
 
@@ -771,6 +777,7 @@ pub fn parse_cc_question(text: &str) -> Option<CcQuestion> {
     }
 
     // Find the prompt: non-empty line(s) before the first option, going backwards.
+    let first_idx = option_pos[0].0;
     let mut prompt_parts: Vec<String> = Vec::new();
     let mut i = first_idx;
     while i > 0 {

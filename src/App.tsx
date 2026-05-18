@@ -54,6 +54,51 @@ function App() {
   const [selectedSession, setSelectedSession] = createSignal<UnifiedSession | null>(null);
   const [messages, setMessages] = createSignal<UnifiedMessage[]>([]);
   const [toolStats, setToolStats] = createSignal<ToolStat[]>([]);
+
+  // Optimistic messages: appended immediately on send, removed when the real
+  // message arrives from polling or a fresh session load.
+  const [pendingMsgs, setPendingMsgs] = createSignal<{ id: string; sessionId: string; text: string }[]>([]);
+
+  const addOptimistic = (sessionId: string, text: string) => {
+    const id = `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setPendingMsgs(p => [...p, { id, sessionId, text }]);
+    // Safety net: drop if not matched within 30 s.
+    setTimeout(() => setPendingMsgs(p => p.filter(m => m.id !== id)), 30_000);
+  };
+
+  const flushOptimistic = (sessionId: string, newMsgs: UnifiedMessage[]) => {
+    const realTexts = newMsgs
+      .filter(m => m.role === "User")
+      .flatMap(m => m.content)
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map(b => b.text.trim());
+    if (!realTexts.length) return;
+    const pool = [...realTexts];
+    setPendingMsgs(prev => prev.filter(o => {
+      if (o.sessionId !== sessionId) return true;
+      const idx = pool.findIndex(t => t === o.text.trim());
+      if (idx === -1) return true;
+      pool.splice(idx, 1);
+      return false;
+    }));
+  };
+
+  const visibleMessages = createMemo((): UnifiedMessage[] => {
+    const sel = selectedSession();
+    const base = messages();
+    if (!sel) return base;
+    const pending = pendingMsgs()
+      .filter(o => o.sessionId === sel.id)
+      .map(o => ({
+        id: o.id,
+        role: "User" as const,
+        content: [{ type: "text" as const, text: o.text }],
+        timestamp: new Date().toISOString(),
+        model: null as null,
+        _optimistic: true as const,
+      }));
+    return pending.length ? [...base, ...pending] : base;
+  });
   const [loading, setLoading] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal("");
   const [focusedRowIndex, setFocusedRowIndex] = createSignal<number>(-1);
@@ -425,6 +470,7 @@ function App() {
     setLoading(true);
     try {
       const data = await getSessionData(session.id);
+      flushOptimistic(session.id, data.messages);
       setMessages(data.messages);
       setToolStats(data.tool_stats);
     } catch (e) {
@@ -631,6 +677,7 @@ function App() {
         const currentLen = messages().length;
         const newMsgs = await getSessionMessagesSince(s.id, currentLen);
         if (newMsgs.length > 0) {
+          flushOptimistic(s.id, newMsgs);
           setMessages(prev => [...prev, ...newMsgs]);
         }
       } catch { /* ignore */ }
@@ -822,7 +869,7 @@ function App() {
         sortedSessions={sortedSessions()}
         selectedSession={selectedSession()}
         focusedIndex={focusedRowIndex()}
-        messages={messages()}
+        messages={visibleMessages()}
         toolStats={toolStats()}
         loading={loading()}
         tailing={tailing()}
@@ -848,7 +895,11 @@ function App() {
         onToggleTail={() => tailing() ? stopTailing() : startTailing()}
         onTogglePin={togglePin}
         onSwitchToTerminal={() => setUiMode("terminal")}
-        onSendTmux={sendToTmuxPane}
+        onSendTmux={async (pane, text) => {
+          const sid = selectedSession()?.id;
+          if (sid) addOptimistic(sid, text);
+          await sendToTmuxPane(pane, text);
+        }}
         onOpenPalette={() => setPaletteOpen(true)}
         detailWidth={detailWidth()}
         detailHeight={detailHeight()}
@@ -1161,7 +1212,7 @@ function App() {
               }}
             ></div>
             <ConversationView
-              messages={messages()}
+              messages={visibleMessages()}
               loading={loading()}
               sessionName={sessionName()}
               tailing={tailing()}
@@ -1179,7 +1230,10 @@ function App() {
               pane={selectedSession()?.tmux_pane ?? null}
               sessionId={selectedSession()!.id}
             />
-            <Composer session={selectedSession()!} />
+            <Composer
+              session={selectedSession()!}
+              onSend={(text) => addOptimistic(selectedSession()!.id, text)}
+            />
           </Show>
         </div>
       </div>

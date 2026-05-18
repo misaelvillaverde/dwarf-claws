@@ -1,8 +1,8 @@
-import { Component, Show, createSignal, createMemo } from "solid-js";
+import { Component, Show, createSignal, createMemo, createEffect } from "solid-js";
 import { sendTmuxKeys, captureTmuxPane } from "../lib/api";
 import type { PendingToolCall } from "../lib/sessionState";
 import { useSharedClock } from "../lib/clock";
-import { parsePromptOptions, keyForIntent } from "../lib/promptDetection";
+import { parsePromptOptions } from "../lib/promptDetection";
 import { decisionFor, setToolDecision, decisionLabel } from "../lib/toolDecisions";
 
 interface Props {
@@ -28,6 +28,8 @@ interface ActiveProps {
 const PendingToolBarActive: Component<ActiveProps> = (props) => {
   const [busy, setBusy] = createSignal<string | null>(null);
   const [status, setStatus] = createSignal<string | null>(null);
+  // null = still checking, true = prompt visible, false = tool is running (auto-approved)
+  const [hasPrompt, setHasPrompt] = createSignal<boolean | null>(null);
   const now = useSharedClock();
 
   const first = createMemo(() => props.pending[0]!);
@@ -38,26 +40,25 @@ const PendingToolBarActive: Component<ActiveProps> = (props) => {
     return now() - f.ts >= GRACE_MS;
   });
 
+  // Once actionable (grace period elapsed), check if the pane actually shows a
+  // permission prompt. If not, the tool was auto-approved and is already running.
+  createEffect(() => {
+    if (!actionable() || !props.pane || decided()) return;
+    const pane = props.pane;
+    captureTmuxPane(pane)
+      .then(text => setHasPrompt(parsePromptOptions(text).detected))
+      .catch(() => setHasPrompt(true)); // assume prompt on error
+  });
+
   const send = async (intent: "allow" | "always" | "deny" | "esc") => {
     const pane = props.pane;
     if (!pane || busy()) return;
     setBusy(intent);
     setStatus(null);
     try {
-      let key: string;
-      if (intent === "esc") {
-        key = "Escape";
-      } else {
-        // Capture CC's actual prompt to map intent → correct key. Option order
-        // varies by CC version (Bash often shows: 1=Yes, 2=Deny, 3=Always).
-        try {
-          const text = await captureTmuxPane(pane);
-          const parsed = parsePromptOptions(text);
-          key = keyForIntent(intent, parsed);
-        } catch {
-          key = keyForIntent(intent, { allow: null, always: null, deny: null, raw: [], detected: false });
-        }
-      }
+      // Fixed mapping: CC permission prompt is always 1=Allow, 2=Always, 3=Deny.
+      const KEY: Record<string, string> = { allow: "1", always: "2", deny: "3", esc: "Escape" };
+      const key = KEY[intent] ?? "Escape";
       await sendTmuxKeys(pane, [key]);
       if (intent !== "esc") {
         const target = first();
@@ -146,7 +147,7 @@ const PendingToolBarActive: Component<ActiveProps> = (props) => {
           +{props.pending.length - 1} more
         </span>
       </Show>
-      <Show when={!decided() && !actionable() && props.pane}>
+      <Show when={!decided() && !actionable()}>
         <span class="ink-faint" style={{ "font-size": "11px", "font-style": "italic" }}>
           waiting…
         </span>
@@ -156,44 +157,51 @@ const PendingToolBarActive: Component<ActiveProps> = (props) => {
           waiting for tool to finish…
         </span>
       </Show>
-      <span style={{ "margin-left": "auto", display: "flex", gap: "6px" }}>
-        <button
-          type="button"
-          class="dc-pending-btn"
-          onClick={() => send("allow")}
-          disabled={!actionable() || !!busy() || decided()}
-          title="Allow once (auto-detects CC's prompt option)"
-        >
-          Allow
-        </button>
-        <button
-          type="button"
-          class="dc-pending-btn"
-          onClick={() => send("always")}
-          disabled={!actionable() || !!busy() || decided()}
-          title="Allow and don't ask again (auto-detects CC's prompt option)"
-        >
-          Always
-        </button>
-        <button
-          type="button"
-          class="dc-pending-btn warn"
-          onClick={() => send("deny")}
-          disabled={!actionable() || !!busy() || decided()}
-          title="Deny and tell Claude (auto-detects CC's prompt option)"
-        >
-          Deny
-        </button>
-        <button
-          type="button"
-          class="dc-pending-btn ghost"
-          onClick={() => send("esc")}
-          disabled={!!busy() || !props.pane}
-          title="Send Escape (close CC dialog)"
-        >
-          esc
-        </button>
-      </span>
+      <Show when={actionable() && hasPrompt() === false}>
+        <span class="ink-faint" style={{ "font-size": "11px", "font-style": "italic" }}>
+          running…
+        </span>
+      </Show>
+      <Show when={!decided() && hasPrompt() !== false}>
+        <span style={{ "margin-left": "auto", display: "flex", gap: "6px" }}>
+          <button
+            type="button"
+            class="dc-pending-btn"
+            onClick={() => send("allow")}
+            disabled={!actionable() || !!busy()}
+            title="Allow once (1)"
+          >
+            Allow
+          </button>
+          <button
+            type="button"
+            class="dc-pending-btn"
+            onClick={() => send("always")}
+            disabled={!actionable() || !!busy()}
+            title="Always allow (2)"
+          >
+            Always
+          </button>
+          <button
+            type="button"
+            class="dc-pending-btn warn"
+            onClick={() => send("deny")}
+            disabled={!actionable() || !!busy()}
+            title="Deny (3)"
+          >
+            Deny
+          </button>
+          <button
+            type="button"
+            class="dc-pending-btn ghost"
+            onClick={() => send("esc")}
+            disabled={!!busy() || !props.pane}
+            title="Send Escape"
+          >
+            esc
+          </button>
+        </span>
+      </Show>
       <Show when={status()}>
         <span
           style={{
