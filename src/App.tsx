@@ -455,9 +455,12 @@ function App() {
     }
   };
 
+  let allLoadedSessions: UnifiedSession[] = [];
+
   const loadSessions = async () => {
     try {
       const result = await listSessions();
+      allLoadedSessions = result;
       setSessions(result);
       fireTransitionNotifications(result);
     } catch (e) {
@@ -503,8 +506,16 @@ function App() {
 
     setHighlightedSessionIds(null);
     try {
-      const result = await searchSessions(query);
-      setSessions(result);
+      const rustResult = await searchSessions(query);
+      // Also match custom names (frontend-only localStorage) against the full session list.
+      const q = query.toLowerCase();
+      const rustIds = new Set(rustResult.map(s => s.id));
+      const customMatches = allLoadedSessions.filter(s => {
+        if (rustIds.has(s.id)) return false;
+        const cn = customNameFor(s.id);
+        return !!cn && cn.toLowerCase().includes(q);
+      });
+      setSessions([...rustResult, ...customMatches]);
     } catch (e) {
       console.error("Failed to search:", e);
     }
