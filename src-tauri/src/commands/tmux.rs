@@ -653,6 +653,169 @@ pub fn list_tmux_panes() -> Vec<TmuxPaneInfo> {
     out
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CcOption {
+    pub number: u8,
+    pub label: String,
+    pub description: Option<String>,
+    pub is_freetext: bool,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CcQuestion {
+    pub prompt: String,
+    pub options: Vec<CcOption>,
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' && chars.peek() == Some(&'[') {
+            chars.next();
+            while let Some(&nc) = chars.peek() {
+                chars.next();
+                if nc.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
+fn match_numbered_option(line: &str) -> Option<(u8, String)> {
+    let cleaned = strip_ansi(line.trim_start());
+    let s = cleaned.trim_start();
+    let dot = s.find(". ")?;
+    if dot == 0 || dot > 2 {
+        return None;
+    }
+    let num_str = &s[..dot];
+    if !num_str.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let num: u8 = num_str.parse().ok()?;
+    let label = s[dot + 2..].trim().to_string();
+    if label.is_empty() {
+        return None;
+    }
+    Some((num, label))
+}
+
+pub fn parse_cc_question(text: &str) -> Option<CcQuestion> {
+    let lines: Vec<String> = text.lines().map(strip_ansi).collect();
+    let n = lines.len();
+    let start = n.saturating_sub(80);
+    let recent = &lines[start..];
+
+    // Collect numbered option positions.
+    let mut option_pos: Vec<(usize, u8, String)> = Vec::new();
+    for (i, line) in recent.iter().enumerate() {
+        if let Some((num, label)) = match_numbered_option(line) {
+            option_pos.push((i, num, label));
+        }
+    }
+
+    if option_pos.len() < 2 {
+        return None;
+    }
+    // Must have options 1 and 2 to count as a CC question.
+    let has_one = option_pos.iter().any(|(_, n, _)| *n == 1);
+    let has_two = option_pos.iter().any(|(_, n, _)| *n == 2);
+    if !has_one || !has_two {
+        return None;
+    }
+
+    // Options must appear in the most recent chunk (not ancient history).
+    let first_idx = option_pos[0].0;
+    if first_idx + 40 < recent.len() {
+        return None;
+    }
+
+    // Build option structs with optional descriptions.
+    let mut options: Vec<CcOption> = Vec::new();
+    for i in 0..option_pos.len() {
+        let (line_idx, num, label) = &option_pos[i];
+        let next_idx = option_pos
+            .get(i + 1)
+            .map_or(recent.len(), |(idx, _, _)| *idx);
+        let mut desc_parts: Vec<String> = Vec::new();
+        for k in (line_idx + 1)..next_idx {
+            let l = &recent[k];
+            let trimmed = l.trim();
+            if trimmed.is_empty() {
+                break;
+            }
+            if (l.starts_with(' ') || l.starts_with('\t'))
+                && match_numbered_option(l).is_none()
+            {
+                desc_parts.push(trimmed.to_string());
+            } else {
+                break;
+            }
+        }
+        let is_freetext = label.to_lowercase().contains("type something");
+        options.push(CcOption {
+            number: *num,
+            label: label.clone(),
+            description: if desc_parts.is_empty() {
+                None
+            } else {
+                Some(desc_parts.join(" "))
+            },
+            is_freetext,
+        });
+    }
+
+    // Find the prompt: non-empty line(s) before the first option, going backwards.
+    let mut prompt_parts: Vec<String> = Vec::new();
+    let mut i = first_idx;
+    while i > 0 {
+        i -= 1;
+        let l = recent[i].trim().to_string();
+        if l.is_empty() {
+            if !prompt_parts.is_empty() {
+                break;
+            }
+            continue;
+        }
+        // Navigation / separator lines — stop.
+        if l.contains('□')
+            || l.contains('✓')
+            || l.contains('→')
+            || l.contains('─')
+            || l.contains('━')
+            || l.contains('┄')
+        {
+            break;
+        }
+        prompt_parts.push(l);
+    }
+    prompt_parts.reverse();
+    let prompt = prompt_parts.join(" ").trim().to_string();
+
+    if prompt.is_empty() {
+        return None;
+    }
+
+    Some(CcQuestion { prompt, options })
+}
+
+#[tauri::command]
+pub fn get_pane_question(pane: String) -> Option<CcQuestion> {
+    if !valid_pane(&pane) {
+        return None;
+    }
+    let text = pane_scrollback(&pane);
+    if text.is_empty() {
+        return None;
+    }
+    parse_cc_question(&text)
+}
+
 /// Map of cwd -> "session:window.pane" using `tmux list-panes -a`.
 /// Empty when tmux is not installed or no server is running.
 pub fn pane_by_cwd() -> HashMap<String, String> {

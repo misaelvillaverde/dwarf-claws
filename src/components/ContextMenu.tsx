@@ -34,10 +34,18 @@ const ContextMenu: Component<Props> = (props) => {
 
   const clampedPos = () => {
     if (typeof window === "undefined") return { x: props.x, y: props.y };
+    // body has `zoom: var(--font-scale)`. CSS zoom makes position:fixed children
+    // render at coord*zoom visually, but clientX/Y are in viewport pixels.
+    // Divide by zoom so the menu lands exactly under the cursor.
+    const z = parseFloat(getComputedStyle(document.body).zoom) || 1;
     const menuW = 220;
     const menuH = Math.min(280, 28 * props.items.length + 8);
-    const x = Math.min(props.x, window.innerWidth - menuW - 8);
-    const y = Math.min(props.y, window.innerHeight - menuH - 8);
+    const rx = props.x / z;
+    const ry = props.y / z;
+    const vw = window.innerWidth / z;
+    const vh = window.innerHeight / z;
+    const x = Math.min(rx, vw - menuW - 8);
+    const y = Math.min(ry, vh - menuH - 8);
     return { x: Math.max(8, x), y: Math.max(8, y) };
   };
 

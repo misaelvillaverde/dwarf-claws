@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { UnifiedSession, UnifiedMessage, ToolStat } from "./types";
+import type { UnifiedSession, UnifiedMessage, ToolStat, CcQuestion } from "./types";
 
 export async function listSessions(): Promise<UnifiedSession[]> {
   return invoke("list_sessions");
@@ -91,4 +91,8 @@ export interface TmuxProbe {
 
 export async function probeTmux(): Promise<TmuxProbe> {
   return invoke("probe_tmux");
+}
+
+export async function getPaneQuestion(pane: string): Promise<CcQuestion | null> {
+  return invoke("get_pane_question", { pane });
 }

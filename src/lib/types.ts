@@ -47,6 +47,18 @@ export type ContentBlock =
   | { type: "tool_call"; tool_name: string; tool_id: string; input: string }
   | { type: "tool_result"; tool_id: string; output: string; is_error: boolean };
 
+export interface CcOption {
+  number: number;
+  label: string;
+  description: string | null;
+  is_freetext: boolean;
+}
+
+export interface CcQuestion {
+  prompt: string;
+  options: CcOption[];
+}
+
 export interface ToolStat {
   tool_name: string;
   call_count: number;

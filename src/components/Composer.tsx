@@ -1,9 +1,11 @@
 import { Component, For, Show, createSignal, createEffect, onCleanup } from "solid-js";
-import { sendToTmuxPane } from "../lib/api";
-import type { UnifiedSession } from "../lib/types";
+import { sendToTmuxPane, getPaneQuestion } from "../lib/api";
+import type { UnifiedSession, CcQuestion } from "../lib/types";
 import SlashCommandPopup from "./SlashCommandPopup";
+import QuestionBar from "./QuestionBar";
 import { clearDraft, getDraft, setDraft } from "../lib/drafts";
 import { detectXmlTags } from "../lib/markdown";
+import { open } from "@tauri-apps/plugin-dialog";
 
 interface Props {
   session: UnifiedSession;
@@ -14,9 +16,11 @@ const Composer: Component<Props> = (props) => {
   const [status, setStatus] = createSignal<string | null>(null);
   const [slashQuery, setSlashQuery] = createSignal<string | null>(null);
   const [xmlTags, setXmlTags] = createSignal<string[]>([]);
+  const [question, setQuestion] = createSignal<CcQuestion | null>(null);
   let textareaRef: HTMLTextAreaElement | undefined;
   let popupKeyHandler: ((e: KeyboardEvent) => boolean) | null = null;
   let draftSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  let questionTimer: ReturnType<typeof setInterval> | null = null;
 
   const computeSlashQuery = (v: string): string | null => {
     if (!v.startsWith("/")) return null;
@@ -41,8 +45,22 @@ const Composer: Component<Props> = (props) => {
     setStatus(null);
   });
 
+  // Poll for CC question prompts in the bound pane.
+  createEffect(() => {
+    const pane = props.session.tmux_pane;
+    if (questionTimer) clearInterval(questionTimer);
+    setQuestion(null);
+    if (!pane) return;
+    const poll = () => {
+      getPaneQuestion(pane).then(setQuestion).catch(() => setQuestion(null));
+    };
+    poll();
+    questionTimer = setInterval(poll, 2000);
+  });
+
   onCleanup(() => {
     if (draftSaveTimer) clearTimeout(draftSaveTimer);
+    if (questionTimer) clearInterval(questionTimer);
   });
 
   const scheduleDraftSave = (id: string, value: string) => {
@@ -103,9 +121,32 @@ const Composer: Component<Props> = (props) => {
     });
   };
 
+  const attachImage = async () => {
+    const selected = await open({
+      multiple: true,
+      filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "heic", "avif"] }],
+    });
+    if (!selected || !textareaRef) return;
+    const paths = Array.isArray(selected) ? selected : [selected];
+    const insert = paths.join("\n");
+    const cur = textareaRef.value;
+    const sep = cur && !cur.endsWith("\n") ? "\n" : "";
+    textareaRef.value = cur + sep + insert;
+    textareaRef.dispatchEvent(new Event("input", { bubbles: true }));
+    scheduleDraftSave(props.session.id, textareaRef.value);
+  };
+
   const hasPane = () => !!props.session.tmux_pane;
 
   return (
+    <>
+    <Show when={question() && props.session.tmux_pane}>
+      <QuestionBar
+        question={question()!}
+        pane={props.session.tmux_pane!}
+        onDismiss={() => setQuestion(null)}
+      />
+    </Show>
     <div style={{
       "border-top": "1px solid var(--rule)",
       background: "var(--paper-2)",
@@ -186,6 +227,16 @@ const Composer: Component<Props> = (props) => {
           }}
         />
         <button
+          type="button"
+          class="btn-ghost"
+          title="attach image (inserts path)"
+          disabled={!hasPane()}
+          onClick={attachImage}
+          style={{ height: "30px", "font-size": "14px", padding: "0 6px" }}
+        >
+          ⎘
+        </button>
+        <button
           onClick={send}
           disabled={!hasPane() || sending()}
           style={{
@@ -197,6 +248,7 @@ const Composer: Component<Props> = (props) => {
         </button>
       </div>
     </div>
+    </>
   );
 };
 
